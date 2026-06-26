@@ -62,7 +62,7 @@ pip install --user ymtui
 
 ```bash
 # Debian / Ubuntu — заголовки для сборки PyGObject
-sudo apt install libgirepository1.0-dev gir1.2-glib-2.0 gcc pkg-config python3-dev
+sudo apt install libgirepository-2.0-dev gir1.2-glib-2.0 gcc pkg-config python3-dev
 
 pipx install "ymtui[mpris]"     # или uv tool install "ymtui[mpris]"
 ```
