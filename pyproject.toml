@@ -1,0 +1,57 @@
+[project]
+name = "ymtui"
+version = "0.1.0"
+description = "Консольный плеер Яндекс Музыки"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Sergey Ovechkin", email = "pomeo@pomeo.ru" },
+]
+keywords = [
+    "yandex-music", "yandex", "music", "player",
+    "tui", "terminal", "console", "textual", "mpris",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Players",
+    "Topic :: Terminals",
+    "Natural Language :: Russian",
+]
+dependencies = [
+    "textual>=8.2.5",
+    "yandex-music>=3.0.0",
+    "python-mpv>=1.0.0",
+]
+
+# MPRIS (медиа-клавиши) тянет PyGObject, которому нужны системные
+# заголовки — поэтому вынесено в опциональную зависимость.
+[project.optional-dependencies]
+mpris = ["mpris-server>=1.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/pomeo/ymtui"
+Repository = "https://github.com/pomeo/ymtui"
+Issues = "https://github.com/pomeo/ymtui/issues"
+
+[project.scripts]
+ymtui = "ymtui.app:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ymtui"]
+
+[tool.hatch.build.targets.sdist]
+include = ["ymtui", "README.md", "LICENSE"]

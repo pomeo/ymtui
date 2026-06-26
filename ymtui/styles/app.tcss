@@ -1,0 +1,171 @@
+/* ============================================================
+   Yandex Music TUI — spotify-tui inspired layout
+   ============================================================ */
+
+Screen {
+    background: $background;
+    layers: base;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 1;
+    scrollbar-background: $surface;
+    scrollbar-background-hover: $surface;
+    scrollbar-background-active: $surface;
+    scrollbar-color: $panel;
+    scrollbar-color-hover: $border;
+    scrollbar-color-active: $border;
+}
+
+/* Every bordered panel shares this look; the focused one lights up. */
+SearchBar, Library, Collection, TrackList, NowPlaying, #help {
+    border: round $border;
+    border-title-color: $accent;
+    border-title-style: bold;
+    background: $surface;
+}
+
+SearchBar:focus, Library:focus, Collection:focus, TrackList:focus {
+    border: round $accent;
+    /* Drop Textual's default focus tint — only the border should change. */
+    background-tint: $surface 0%;
+}
+
+/* ============================================================
+   Top row: Search + Help
+   ============================================================ */
+
+#top-row {
+    height: 3;
+    width: 100%;
+}
+
+#search {
+    width: 1fr;
+    height: 3;
+}
+
+#help {
+    width: 12;
+    height: 3;
+    content-align: center middle;
+    color: $text-muted;
+}
+
+/* ============================================================
+   Middle row: sidebar + songs
+   ============================================================ */
+
+#mid-row {
+    height: 1fr;
+    width: 100%;
+}
+
+#sidebar {
+    width: 28;
+    height: 100%;
+}
+
+#library {
+    height: auto;
+    max-height: 60%;
+}
+
+#collection {
+    height: 1fr;
+}
+
+Library, Collection {
+    padding: 0 1;
+    scrollbar-size: 1 1;
+    scrollbar-color: $panel;
+    scrollbar-color-hover: $border;
+    scrollbar-color-active: $border;
+    scrollbar-background: $surface;
+}
+
+Library > ListItem, Collection > ListItem {
+    padding: 0 1;
+}
+
+/* ============================================================
+   Songs table
+   ============================================================ */
+
+#tracklist {
+    width: 1fr;
+    height: 100%;
+    scrollbar-color: $panel;
+    scrollbar-color-hover: $border;
+    scrollbar-color-active: $border;
+    scrollbar-background: $surface;
+}
+
+TrackList > .datatable--header {
+    background: $surface;
+    color: $text-muted;
+    text-style: bold;
+}
+
+TrackList > .datatable--cursor {
+    background: $accent 30%;
+    color: $text;
+}
+
+/* ============================================================
+   Now playing
+   ============================================================ */
+
+#now-playing {
+    height: 6;
+    width: 100%;
+    padding: 0 1;
+}
+
+/* Title/artist stay on a single line — truncate long names instead of
+   wrapping, which would otherwise push the progress bar out of the panel. */
+#np-title, #np-artist {
+    width: 100%;
+    height: 1;
+    text-wrap: nowrap;
+    text-overflow: ellipsis;
+}
+
+#np-title {
+    text-style: bold;
+    color: $text;
+}
+
+#np-artist {
+    color: $text-muted;
+}
+
+#np-progress {
+    height: 1;
+    margin-top: 1;
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+
+Footer {
+    background: $panel;
+}
+
+/* ============================================================
+   Help modal
+   ============================================================ */
+
+HelpScreen {
+    align: center middle;
+    background: $background 70%;
+}
+
+#help-box {
+    width: 56;
+    height: auto;
+    padding: 1 2;
+    border: round $accent;
+    border-title-color: $accent;
+    border-title-style: bold;
+    background: $surface;
+}

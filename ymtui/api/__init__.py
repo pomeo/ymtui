@@ -1,0 +1,1 @@
+"""Yandex Music API package."""
