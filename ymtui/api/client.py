@@ -1,6 +1,7 @@
 """Thin wrapper around yandex-music Client."""
 from __future__ import annotations
 
+import datetime
 from typing import Optional
 
 from yandex_music import Client, Playlist, Track
@@ -14,6 +15,7 @@ class YMClient:
         self._liked_ids: set[str] | None = None
         self._metatags = None
         self._metatags_fetched = False
+        self._chart_item: str | None = None  # owner:kind плейлиста-чарта
 
     # ------------------------------------------------------------------
     # Account
@@ -147,9 +149,19 @@ class YMClient:
 
     def chart(self, region: str = 'russia') -> list[Track]:
         result = self._client.chart(region)
-        if not result or not result.chart or not result.chart.tracks:
+        if not result or not result.chart:
+            self._chart_item = None
             return []
-        return [t.track for t in result.chart.tracks if t.track]
+        ch = result.chart
+        owner = getattr(getattr(ch, 'owner', None), 'uid', None)
+        kind = getattr(ch, 'kind', None)
+        # Чарт — это плейлист; его owner:kind нужен как context-item.
+        self._chart_item = f'{owner}:{kind}' if owner and kind else None
+        return [t.track for t in (ch.tracks or []) if t.track]
+
+    @property
+    def chart_item(self) -> str | None:
+        return self._chart_item
 
     # ------------------------------------------------------------------
     # «Моя волна» — personal infinite radio (rotor station)
@@ -266,6 +278,55 @@ class YMClient:
     # ------------------------------------------------------------------
     # Streaming
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Play reporting (как официальный клиент — для истории/статистики)
+    # ------------------------------------------------------------------
+
+    def report_play(self, track: Track, from_: str, played_seconds: float,
+                    length_seconds: float, playlist_id: Optional[str] = None,
+                    play_id: Optional[str] = None, change_reason: Optional[str] = None,
+                    context: Optional[str] = None, context_item: Optional[str] = None,
+                    batch_id: Optional[str] = None) -> None:
+        """Send a play-audio event (the request the official client makes).
+
+        Built manually (not via ``Client.play_audio``) so we can include the
+        ``context`` / ``context-item`` / ``change-reason`` fields — without the
+        context the play is accepted but never lands in listening history.
+        """
+        try:
+            album_id = str(track.albums[0].id) if track.albums else None
+            if not album_id or not getattr(track, 'id', None):
+                return
+            now = (datetime.datetime.now(datetime.timezone.utc)
+                   .isoformat(timespec='milliseconds').replace('+00:00', 'Z'))
+            played = int(max(0.0, played_seconds))
+            data = {
+                'track-id': str(track.id),
+                'album-id': album_id,
+                'from-cache': 'false',
+                'from': from_,
+                'play-id': play_id or '',
+                'uid': self._client.me.account.uid,
+                'timestamp': now,
+                'client-now': now,
+                'track-length-seconds': int(length_seconds or 0),
+                'total-played-seconds': played,
+                'end-position-seconds': played,
+            }
+            if context:
+                data['context'] = context
+            if context_item:
+                data['context-item'] = context_item
+            if playlist_id:
+                data['playlist-id'] = playlist_id
+            if batch_id:
+                data['batch-id'] = batch_id  # для радио («Моя волна»)
+            if change_reason:
+                data['change-reason'] = change_reason
+            self._client._request.post(f'{self._client.base_url}/play-audio', data)
+        except Exception:
+            pass
 
     def get_stream_url(self, track: Track) -> Optional[str]:
         """Return the best available direct stream URL for a track."""

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 import random
+import uuid
 
 from textual.app import App, SystemCommand
 from textual.theme import Theme
@@ -73,6 +74,12 @@ class YMPlayerApp(App):
         self._wave_batches: dict[str, str] = {}  # track id -> batch id (for feedback)
         self._wave_fetching: bool = False
         self._wave_last_batch_ids: set[str] = set()  # ids of the previous batch
+        # Play reporting (отстукивание прослушиваний)
+        self._play_id: str | None = None
+        self._play_from: str = 'web-playlist-playlist-default'
+        self._play_context: str | None = None
+        self._play_context_item: str | None = None
+        self._play_playlist_id: str | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -151,7 +158,7 @@ class YMPlayerApp(App):
             )
         except Exception:
             pass
-        # Persist playback position periodically so a crash loses little.
+        # Persist position periodically so a crash loses little.
         if not self.player.is_paused:
             self._save_counter += 1
             if self._save_counter >= 10:
@@ -159,11 +166,45 @@ class YMPlayerApp(App):
                 self._persist_position()
 
     # ------------------------------------------------------------------
+    # Play reporting (отстукивание прослушиваний — только на финише трека)
+    # ------------------------------------------------------------------
+
+    def set_play_context(self, from_: str, context: str | None,
+                         context_item: str | None, playlist_id: str | None) -> None:
+        self._play_from = from_
+        self._play_context = context
+        self._play_context_item = context_item
+        self._play_playlist_id = playlist_id
+
+    def _report_skip(self) -> None:
+        """Report the current track as skipped (next / previous / new selection)."""
+        self._report_play(self.player.position, change_reason='skip')
+
+    def _report_play(self, played: float, change_reason: str | None = None) -> None:
+        track = self._current_track
+        if track is None or not self._started:
+            return
+        length = (track.duration_ms or 0) / 1000
+        pid, frm, plid = self._play_id, self._play_from, self._play_playlist_id
+        ctx, item = self._play_context, self._play_context_item
+        # Radio plays need the batch id of the track's «Моя волна» batch.
+        batch = self._wave_batches.get(str(track.id)) if self._wave else None
+        self.run_worker(
+            lambda: self._client.report_play(
+                track, frm, played, length, playlist_id=plid, play_id=pid,
+                change_reason=change_reason, context=ctx, context_item=item,
+                batch_id=batch,
+            ),
+            thread=True,
+        )
+
+    # ------------------------------------------------------------------
     # Playback
     # ------------------------------------------------------------------
 
     def play_track(self, track: Track, queue_index: int) -> None:
         """Start playing a track and update the queue position."""
+        self._report_skip()  # leaving the current track (if any)
         self._queue = self.screen.query_one(TrackList).tracks
         self._current_index = queue_index
         self._start_track(track)
@@ -199,6 +240,8 @@ class YMPlayerApp(App):
     def next_track(self, skipped: bool = True) -> None:
         if not self._queue:
             return
+        if skipped:
+            self._report_skip()  # outgoing track skipped
         if self._wave:
             # «Моя волна»: sequential, infinite — keep the queue topped up.
             if skipped:
@@ -218,6 +261,7 @@ class YMPlayerApp(App):
 
     def previous_track(self) -> None:
         if self._queue and self._current_index > 0:
+            self._report_skip()  # leaving the current track
             self._current_index -= 1
             self._start_track(self._queue[self._current_index])
 
@@ -311,6 +355,9 @@ class YMPlayerApp(App):
             pass
         self._mpris.update(track)
         self._persist_track()
+        # New play: fresh play_id (used by the finish report when this track ends).
+        self._play_id = str(uuid.uuid4())
+        self._save_counter = 0
         if self._wave and track.id:
             tid = str(track.id)
             batch = self._wave_batches.get(tid)
@@ -451,6 +498,9 @@ class YMPlayerApp(App):
         self.call_from_thread(self._handle_track_end)
 
     def _handle_track_end(self) -> None:
+        # Report the play only when the track finished (change-reason: finish).
+        self._report_play((self._current_track.duration_ms or 0) / 1000
+                          if self._current_track else 0, change_reason='finish')
         if self._wave and self._current_track and self._current_track.id:
             tid = str(self._current_track.id)
             batch = self._wave_batches.get(tid)

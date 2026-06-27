@@ -119,10 +119,36 @@ class MainScreen(Screen):
     # Songs (right panel)
     # ------------------------------------------------------------------
 
+    def _play_context(self, source: dict) -> tuple[str, str | None, str | None, str | None]:
+        """Return (from_, context, context_item, playlist_id) for play reporting.
+
+        The ``context``/``context-item`` pair is what makes a play land in the
+        listening history (grouped by context).
+        """
+        kind = source.get('type')
+        if kind == 'playlist':
+            item = f"{source.get('user_id')}:{source.get('kind')}"
+            return 'web-playlist-playlist-default', 'playlist', item, item
+        if kind == 'liked':
+            item = f"{self._client.account.uid}:3"  # «Мне нравится» = плейлист kind 3
+            return 'web-playlist-playlist-default', 'playlist', item, item
+        if kind == 'album':
+            aid = str(source.get('album_id'))
+            return 'web-album-album-default', 'album', aid, None
+        if kind == 'wave':
+            return 'web-wave-radio-default', 'radio', 'user:onyourwave', None
+        if kind == 'search':
+            return 'web-search-search-default', 'search', source.get('query', ''), None
+        if kind == 'chart':
+            # Чарт — плейлист; точный context-item ставится после загрузки.
+            return 'web-playlist-playlist-default', 'playlist', None, None
+        return 'web-various-various-default', 'various', None, None
+
     def _load_songs(self, source: dict, focus_request: bool = False,
                     autoplay: bool = False) -> None:
         if source.get('type') != 'wave':
             self.app.exit_wave()  # type: ignore[attr-defined]
+        self.app.set_play_context(*self._play_context(source))  # type: ignore[attr-defined]
         self.app.save_source(source)  # type: ignore[attr-defined]
         self._song_source = source
         self.query_one(TrackList).loading = True
@@ -143,6 +169,12 @@ class MainScreen(Screen):
             return
         if kind == 'chart':
             tracks, title = self._client.chart(), t('songs.chart')
+            # Now we know the chart playlist id — set it as the context-item.
+            if self._client.chart_item:
+                self.app.call_from_thread(
+                    self.app.set_play_context, 'web-playlist-playlist-default',
+                    'playlist', self._client.chart_item, self._client.chart_item,
+                )
         elif kind == 'history':
             tracks, title = self._client.history_tracks(), t('songs.history')
         elif kind == 'playlist':
