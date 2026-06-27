@@ -72,6 +72,7 @@ class YMPlayerApp(App):
         self._wave: bool = False
         self._wave_batches: dict[str, str] = {}  # track id -> batch id (for feedback)
         self._wave_fetching: bool = False
+        self._wave_last_batch_ids: set[str] = set()  # ids of the previous batch
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -323,10 +324,12 @@ class YMPlayerApp(App):
         self._wave = True
         self._wave_fetching = False
         self._wave_batches = {str(t.id): batch_id for t in tracks if t.id}
+        self._wave_last_batch_ids = {str(t.id) for t in tracks if t.id}
 
     def exit_wave(self) -> None:
         self._wave = False
         self._wave_batches = {}
+        self._wave_last_batch_ids = set()
 
     def _extend_wave_if_needed(self) -> None:
         if not self._wave or self._wave_fetching or not self._queue:
@@ -349,16 +352,20 @@ class YMPlayerApp(App):
             tl = self.screen.query_one(TrackList)
         except Exception:
             return
-        # Batches can overlap — drop tracks already in the queue.
-        existing = {str(t.id) for t in tl.tracks if t.id}
+        # Drop only the overlap with the *previous* batch (usually the single
+        # echoed continuation track). A radio may legitimately replay a track
+        # later, so we don't dedup against the whole queue — that would shrink
+        # batches and eventually starve the stream.
+        prev, seen = self._wave_last_batch_ids, set()
         fresh: list[Track] = []
         for t in tracks:
             tid = str(t.id) if t.id else None
-            if not tid or tid in existing:
+            if not tid or tid in prev or tid in seen:
                 continue
-            existing.add(tid)
+            seen.add(tid)
             self._wave_batches[tid] = batch_id
             fresh.append(t)
+        self._wave_last_batch_ids = {str(t.id) for t in tracks if t.id}
         if fresh:
             # The queue is the same list object as the table's tracks, so
             # appending rows also extends the playback queue.
