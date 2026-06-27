@@ -46,6 +46,14 @@ def _track_id_path(track: 'Track') -> str:
     return f'/com/yandex/music/track/{safe}'
 
 
+def _cover_url(track: 'Track', size: str = '400x400') -> str | None:
+    """Album cover URL for MPRIS art (the cover_uri exists for any track)."""
+    uri = getattr(track, 'cover_uri', None)
+    if not uri and getattr(track, 'albums', None):
+        uri = track.albums[0].cover_uri
+    return ('https://' + uri.replace('%%', size)) if uri else None
+
+
 if _AVAILABLE:
     class _YMAdapter(MprisAdapter):
         def __init__(self, app: 'YMPlayerApp') -> None:
@@ -69,6 +77,7 @@ if _AVAILABLE:
                 artists=artists,
                 album=album,
                 length=length,
+                art_url=_cover_url(t),  # always provided — URL exists for any track
             )
 
         def get_stream_title(self) -> str:

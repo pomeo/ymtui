@@ -36,8 +36,8 @@ def build_main_bindings() -> list[Binding]:
         Binding('r', 'repeat', t('bind.repeat')),
         Binding('comma,less_than_sign', 'seek_back', t('bind.seekback')),
         Binding('full_stop,greater_than_sign', 'seek_forward', t('bind.seekfwd')),
-        Binding('plus,equals_sign', 'volume_up', t('bind.volup')),
-        Binding('minus', 'volume_down', t('bind.voldown')),
+        Binding('plus,equals_sign', 'volume_up', t('bind.volup'), show=False),
+        Binding('minus', 'volume_down', t('bind.voldown'), show=False),
         Binding('slash', 'focus_search', t('bind.search')),
         Binding('tab', 'focus_panel(1)', 'Next panel', show=False),
         Binding('shift+tab', 'focus_panel(-1)', 'Prev panel', show=False),
@@ -87,6 +87,7 @@ class MainScreen(Screen):
         self.query_one('#help', Static).border_title = t('panel.help')
         np = self.query_one(NowPlaying)
         np.device = self._client.display_name
+        np.show_cover(self.app.cover_enabled)  # type: ignore[attr-defined]
         # Reflect the real player/app state so the status bar isn't stale
         # (e.g. showing 80% before the first track sets the actual volume).
         np.volume = self.app.player.volume  # type: ignore[attr-defined]

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import dataclasses
+import io
 import random
 import uuid
 
@@ -16,7 +17,7 @@ from ymtui.mpris import MprisServer
 from ymtui.player import Player
 from ymtui.screens.main_screen import MainScreen
 from ymtui.state import load_state, save_state
-from ymtui.widgets.now_playing import NowPlaying
+from ymtui.widgets.now_playing import COVER_AVAILABLE, NowPlaying
 from ymtui.widgets.tracklist import TrackList
 
 # Yandex-Music-flavoured theme (yellow accent on dark).
@@ -74,6 +75,9 @@ class YMPlayerApp(App):
         self._wave_batches: dict[str, str] = {}  # track id -> batch id (for feedback)
         self._wave_fetching: bool = False
         self._wave_last_batch_ids: set[str] = set()  # ids of the previous batch
+        # Album cover (optional, off by default)
+        self._cover_enabled: bool = bool(self.state.get('cover', False))
+        self._cover_cache: dict[str, bytes] = {}  # album id -> image bytes
         # Play reporting (отстукивание прослушиваний)
         self._play_id: str | None = None
         self._play_from: str = 'web-playlist-playlist-default'
@@ -126,6 +130,70 @@ class YMPlayerApp(App):
                 i18n.t('cmd.language.help'),
                 (lambda lang=lang: self.set_language(lang)),
             )
+        # Album cover toggle (label shows the state it will switch to).
+        target = i18n.t('np.off') if self._cover_enabled else i18n.t('np.on')
+        yield SystemCommand(
+            i18n.t('cmd.cover', state=target),
+            i18n.t('cmd.cover.help'),
+            (lambda: self.set_cover_enabled(not self._cover_enabled)),
+        )
+
+    # ------------------------------------------------------------------
+    # Album cover
+    # ------------------------------------------------------------------
+
+    @property
+    def cover_enabled(self) -> bool:
+        return self._cover_enabled and COVER_AVAILABLE
+
+    def set_cover_enabled(self, enabled: bool) -> None:
+        if enabled and not COVER_AVAILABLE:
+            self.notify(i18n.t('cover.missing'), severity='warning')
+            return
+        self._cover_enabled = enabled
+        self.state['cover'] = enabled
+        save_state(self.state)
+        try:
+            np = self.screen.query_one(NowPlaying)
+            np.show_cover(enabled)
+            if enabled and self._current_track is not None:
+                self._fetch_cover(self._current_track)
+            elif not enabled:
+                np.set_cover(None)
+        except Exception:
+            pass
+
+    def _fetch_cover(self, track: Track) -> None:
+        if not self.cover_enabled or track is None:
+            return
+        album_id = str(track.albums[0].id) if track.albums else None
+        self.run_worker(lambda: self._load_cover(track, album_id), thread=True)
+
+    def _load_cover(self, track: Track, album_id: str | None) -> None:
+        data = self._cover_cache.get(album_id) if album_id else None
+        if data is None:
+            data = self._client.cover_bytes(track)
+            if data and album_id:
+                self._cover_cache[album_id] = data
+        if not data:
+            return
+        # textual-image needs a PIL Image (raw bytes are treated as a path).
+        try:
+            from PIL import Image as PILImage
+            image = PILImage.open(io.BytesIO(data))
+            image.load()
+        except Exception:
+            return
+        self.call_from_thread(self._apply_cover, track, image)
+
+    def _apply_cover(self, track: Track, image) -> None:
+        # Apply only if this is still the current track.
+        cur = self._current_track
+        if cur is not None and str(cur.id) == str(track.id):
+            try:
+                self.screen.query_one(NowPlaying).set_cover(image)
+            except Exception:
+                pass
 
     def set_language(self, lang: str) -> None:
         if lang not in i18n.available_languages():
@@ -355,6 +423,7 @@ class YMPlayerApp(App):
             pass
         self._mpris.update(track)
         self._persist_track()
+        self._fetch_cover(track)
         # New play: fresh play_id (used by the finish report when this track ends).
         self._play_id = str(uuid.uuid4())
         self._save_counter = 0
@@ -493,6 +562,7 @@ class YMPlayerApp(App):
             tl.move_cursor(row=index, scroll=True)
         except Exception:
             pass
+        self._fetch_cover(track)
 
     def _on_track_end(self) -> None:
         self.call_from_thread(self._handle_track_end)

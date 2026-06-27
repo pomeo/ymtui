@@ -3,12 +3,18 @@ from __future__ import annotations
 
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Container
+from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import Label, Static
 
 from ymtui.i18n import t
+
+try:
+    from textual_image.widget import Image as CoverImage
+    COVER_AVAILABLE = True
+except ImportError:  # optional extra: ymtui[cover]
+    COVER_AVAILABLE = False
 
 # Filled / empty styles for the progress bar (Yandex yellow on dark).
 _FILLED = 'bold #1a1a1a on #ffdb4d'
@@ -81,13 +87,33 @@ class NowPlaying(Container):
     device: reactive[str] = reactive('ymtui')
 
     def compose(self) -> ComposeResult:
-        yield Label(t('np.nothing'), id='np-title')
-        yield Label('', id='np-artist')
-        yield ProgressLine(id='np-progress')
+        with Horizontal(id='np-body'):
+            if COVER_AVAILABLE:
+                yield CoverImage(id='np-cover')
+            with Vertical(id='np-info'):
+                yield Label(t('np.nothing'), id='np-title')
+                yield Label('', id='np-artist')
+                yield ProgressLine(id='np-progress')
 
     def on_mount(self) -> None:
         self._refresh_title_label()
         self._refresh_border()
+
+    # ------------------------------------------------------------------
+    # Album cover
+    # ------------------------------------------------------------------
+
+    def set_cover(self, image) -> None:
+        """Set (or clear) the cover image (a PIL Image, or ``None``)."""
+        if not COVER_AVAILABLE:
+            return
+        try:
+            self.query_one('#np-cover', CoverImage).image = image
+        except Exception:
+            pass
+
+    def show_cover(self, enabled: bool) -> None:
+        self.set_class(enabled and COVER_AVAILABLE, 'with-cover')
 
     def retranslate(self) -> None:
         self._refresh_title_label()

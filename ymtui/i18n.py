@@ -100,6 +100,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # command palette
         'cmd.language': 'Language: {name}',
         'cmd.language.help': 'Switch the interface language',
+        'cmd.cover': 'Album cover: {state}',
+        'cmd.cover.help': 'Show/hide album art in the player',
+        'cover.missing': 'Install ymtui[cover] for album art',
     },
     'ru': {
         'panel.search': 'Поиск',
@@ -182,6 +185,9 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 [dim]закрыть:  ?  ·  esc  ·  q[/dim]""",
         'cmd.language': 'Язык: {name}',
         'cmd.language.help': 'Сменить язык интерфейса',
+        'cmd.cover': 'Обложка альбома: {state}',
+        'cmd.cover.help': 'Показывать/скрывать обложку в плеере',
+        'cover.missing': 'Установите ymtui[cover] для обложек',
     },
 }
 

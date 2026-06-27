@@ -1,6 +1,6 @@
 [project]
 name = "ymtui"
-version = "0.1.3"
+version = "0.1.4"
 description = "Консольный плеер Яндекс Музыки"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,6 +37,7 @@ dependencies = [
 # заголовки — поэтому вынесено в опциональную зависимость.
 [project.optional-dependencies]
 mpris = ["mpris-server>=0.9.0,<1.0"]
+cover = ["textual-image>=0.13.0"]
 
 [project.urls]
 Homepage = "https://github.com/pomeo/ymtui"

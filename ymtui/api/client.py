@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+import urllib.request
 from typing import Optional
 
 from yandex_music import Client, Playlist, Track
@@ -327,6 +328,20 @@ class YMClient:
             self._client._request.post(f'{self._client.base_url}/play-audio', data)
         except Exception:
             pass
+
+    def cover_bytes(self, track: Track, size: str = '400x400') -> Optional[bytes]:
+        """Download the album cover image bytes for a track."""
+        uri = getattr(track, 'cover_uri', None)
+        if not uri and track.albums:
+            uri = track.albums[0].cover_uri
+        if not uri:
+            return None
+        url = 'https://' + uri.replace('%%', size)
+        try:
+            with urllib.request.urlopen(url, timeout=10) as resp:
+                return resp.read()
+        except Exception:
+            return None
 
     def get_stream_url(self, track: Track) -> Optional[str]:
         """Return the best available direct stream URL for a track."""
