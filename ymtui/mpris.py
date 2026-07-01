@@ -108,7 +108,7 @@ if _AVAILABLE:
             return self._app.shuffle
 
         def is_repeating(self) -> bool:
-            return self._app.repeat
+            return self._app.repeat_mode != 'off'
 
         def is_playlist(self) -> bool:
             return True

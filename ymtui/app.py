@@ -61,7 +61,7 @@ class YMPlayerApp(App):
         self._current_index: int = -1
         self._current_track: Track | None = None
         self.shuffle: bool = False
-        self.repeat: bool = False
+        self.repeat_mode: str = 'off'  # 'off' | 'all' | 'one'
         self.player.on_track_end(self._on_track_end)
         self._mpris = MprisServer(self)
         # Persisted session state (last source / track / position)
@@ -323,6 +323,8 @@ class YMPlayerApp(App):
             self._current_index = random.randrange(len(self._queue))
         elif self._current_index < len(self._queue) - 1:
             self._current_index += 1
+        elif self.repeat_mode == 'all':
+            self._current_index = 0  # wrap to the start of the queue
         else:
             return
         self._start_track(self._queue[self._current_index])
@@ -338,8 +340,9 @@ class YMPlayerApp(App):
         self._safe_np(lambda np: setattr(np, 'shuffle', self.shuffle))
 
     def toggle_repeat(self) -> None:
-        self.repeat = not self.repeat
-        self._safe_np(lambda np: setattr(np, 'repeat', self.repeat))
+        # Cycle: off → all → one → off
+        self.repeat_mode = {'off': 'all', 'all': 'one', 'one': 'off'}[self.repeat_mode]
+        self._safe_np(lambda np: setattr(np, 'repeat', self.repeat_mode))
 
     def seek(self, delta: float) -> None:
         """Seek the playing track by ``delta`` seconds (or scrub a primed one)."""
@@ -578,7 +581,7 @@ class YMPlayerApp(App):
             self.run_worker(
                 lambda: self._client.wave_track_finished(tid, seconds, batch), thread=True
             )
-        if self.repeat and self._current_track:
+        if self.repeat_mode == 'one' and self._current_track:
             self._start_track(self._current_track)
         else:
             self.next_track(skipped=False)

@@ -83,7 +83,7 @@ class NowPlaying(Container):
     is_playing: reactive[bool] = reactive(False)
     volume: reactive[int] = reactive(80)
     shuffle: reactive[bool] = reactive(False)
-    repeat: reactive[bool] = reactive(False)
+    repeat: reactive[str] = reactive('off')  # 'off' | 'all' | 'one'
     device: reactive[str] = reactive('ymtui')
 
     def compose(self) -> ComposeResult:
@@ -172,7 +172,7 @@ class NowPlaying(Container):
     def _refresh_border(self) -> None:
         on, off = t('np.on'), t('np.off')
         shuffle = on if self.shuffle else off
-        repeat = on if self.repeat else off
+        repeat = {'all': t('np.repeat.all'), 'one': t('np.repeat.one')}.get(self.repeat, off)
         self.border_title = (
             f'{t("np.playing")} ({self.device})  |  {t("np.shuffle")}: {shuffle}  |  '
             f'{t("np.repeat")}: {repeat}  |  {t("np.volume")}: {self.volume}%'

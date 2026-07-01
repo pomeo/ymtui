@@ -92,7 +92,7 @@ class MainScreen(Screen):
         # (e.g. showing 80% before the first track sets the actual volume).
         np.volume = self.app.player.volume  # type: ignore[attr-defined]
         np.shuffle = self.app.shuffle  # type: ignore[attr-defined]
-        np.repeat = self.app.repeat  # type: ignore[attr-defined]
+        np.repeat = self.app.repeat_mode  # type: ignore[attr-defined]
         # Songs panel active on start, so the user can press play right away.
         self.query_one(TrackList).focus()
         self.query_one(Collection).loading = True
