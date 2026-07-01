@@ -11,12 +11,23 @@ from yandex_music import Client, Playlist, Track
 class YMClient:
     WAVE_STATION = 'user:onyourwave'  # «Моя волна» personal radio
 
+    # «Моя волна» station groups: our category key -> rotor id types.  Order
+    # defines how the groups appear under «Моя волна».
+    WAVE_GROUPS: list[tuple[str, tuple[str, ...]]] = [
+        ('activities', ('activity',)),
+        ('moods', ('mood',)),
+        ('genres', ('genre',)),
+        ('eras', ('epoch',)),
+    ]
+
     def __init__(self, token: str) -> None:
         self._client = Client(token).init()
         self._liked_ids: set[str] | None = None
         self._metatags = None
         self._metatags_fetched = False
         self._chart_item: str | None = None  # owner:kind плейлиста-чарта
+        self._wave_station: str = self.WAVE_STATION  # текущая станция волны
+        self._wave_stations: dict[str, list[dict]] | None = None  # кэш списка
 
     # ------------------------------------------------------------------
     # Account
@@ -168,6 +179,39 @@ class YMClient:
     # «Моя волна» — personal infinite radio (rotor station)
     # ------------------------------------------------------------------
 
+    def set_wave_station(self, station: Optional[str]) -> None:
+        """Select which rotor station the wave engine streams/feeds back to."""
+        self._wave_station = station or self.WAVE_STATION
+
+    def wave_stations(self) -> dict[str, list[dict]]:
+        """Return station descriptors grouped by :attr:`WAVE_GROUPS` key.
+
+        Each descriptor is ``{'station': 'activity:run', 'title': 'Бег'}``.
+        Fetched once and cached.
+        """
+        if self._wave_stations is not None:
+            return self._wave_stations
+        type_to_group = {typ: key for key, types in self.WAVE_GROUPS for typ in types}
+        groups: dict[str, list[dict]] = {key: [] for key, _ in self.WAVE_GROUPS}
+        try:
+            stations = self._client.rotor_stations_list()
+        except Exception:
+            stations = []
+        for sr in (stations or []):
+            st = getattr(sr, 'station', None)
+            sid = getattr(st, 'id', None)
+            if not st or not sid:
+                continue
+            group = type_to_group.get(sid.type)
+            if group is None:
+                continue
+            groups[group].append({
+                'station': f'{sid.type}:{sid.tag}',
+                'title': st.name or sid.tag,
+            })
+        self._wave_stations = groups
+        return groups
+
     def wave_batch(self, queue: Optional[str] = None) -> tuple[list[Track], Optional[str]]:
         """Return (tracks, batch_id) for the next wave batch.
 
@@ -175,7 +219,7 @@ class YMClient:
         stream; pass ``None`` to start a fresh wave.
         """
         try:
-            result = self._client.rotor_station_tracks(self.WAVE_STATION, queue=queue)
+            result = self._client.rotor_station_tracks(self._wave_station, queue=queue)
         except Exception:
             return [], None
         if not result:
@@ -186,7 +230,7 @@ class YMClient:
     def wave_radio_started(self, batch_id: Optional[str]) -> None:
         try:
             self._client.rotor_station_feedback_radio_started(
-                self.WAVE_STATION, from_='ymtui', batch_id=batch_id
+                self._wave_station, from_='ymtui', batch_id=batch_id
             )
         except Exception:
             pass
@@ -194,7 +238,7 @@ class YMClient:
     def wave_track_started(self, track_id: str, batch_id: Optional[str]) -> None:
         try:
             self._client.rotor_station_feedback_track_started(
-                self.WAVE_STATION, track_id, batch_id=batch_id
+                self._wave_station, track_id, batch_id=batch_id
             )
         except Exception:
             pass
@@ -202,7 +246,7 @@ class YMClient:
     def wave_track_finished(self, track_id: str, seconds: float, batch_id: Optional[str]) -> None:
         try:
             self._client.rotor_station_feedback_track_finished(
-                self.WAVE_STATION, track_id, total_played_seconds=float(seconds or 0),
+                self._wave_station, track_id, total_played_seconds=float(seconds or 0),
                 batch_id=batch_id,
             )
         except Exception:
@@ -211,7 +255,7 @@ class YMClient:
     def wave_skip(self, track_id: str, seconds: float, batch_id: Optional[str]) -> None:
         try:
             self._client.rotor_station_feedback_skip(
-                self.WAVE_STATION, track_id, total_played_seconds=float(seconds or 0),
+                self._wave_station, track_id, total_played_seconds=float(seconds or 0),
                 batch_id=batch_id,
             )
         except Exception:

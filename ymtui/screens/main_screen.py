@@ -107,7 +107,14 @@ class MainScreen(Screen):
             self.query_one(Library).index = idx
 
         tag = self.app.state.get('tag')  # type: ignore[attr-defined]
-        if category in self.TREE_TITLES and tag:
+        if category == 'wave':
+            # Reopen «Моя волна» at the level we left off (groups or a group).
+            group = self.app.state.get('wave_group')  # type: ignore[attr-defined]
+            if group:
+                self._open_wave_group(group)
+            else:
+                self._open_wave_groups()
+        elif category in self.TREE_TITLES and tag:
             # We were drilled into a metatag: reopen its playlists directly.
             self._open_tag(tag['tag'], tag['title'])
         elif category in Library.COLLECTION_CATEGORIES:
@@ -137,7 +144,8 @@ class MainScreen(Screen):
             aid = str(source.get('album_id'))
             return 'web-album-album-default', 'album', aid, None
         if kind == 'wave':
-            return 'web-wave-radio-default', 'radio', 'user:onyourwave', None
+            station = source.get('station') or self._client.WAVE_STATION
+            return 'web-wave-radio-default', 'radio', station, None
         if kind == 'search':
             return 'web-search-search-default', 'search', source.get('query', ''), None
         if kind == 'chart':
@@ -160,6 +168,7 @@ class MainScreen(Screen):
     def _fetch_songs(self, source: dict, focus_request: bool, autoplay: bool = False) -> None:
         kind = source.get('type')
         if kind == 'wave':
+            self._client.set_wave_station(source.get('station'))
             tracks, batch_id = self._client.wave_batch()
             if batch_id:
                 self._client.wave_radio_started(batch_id)
@@ -210,7 +219,7 @@ class MainScreen(Screen):
 
     def _apply_wave(self, tracks, batch_id, liked_ids, focus, autoplay) -> None:
         tl = self.query_one(TrackList)
-        tl.load_tracks(tracks, t('songs.wave'), liked_ids)
+        tl.load_tracks(tracks, self._wave_title(self._song_source), liked_ids)
         self.app.start_wave(batch_id, tracks)  # type: ignore[attr-defined]
         if focus or self._first_load:
             tl.focus()
@@ -269,6 +278,38 @@ class MainScreen(Screen):
         items = [self._playlist_item(p) for p in self._client.metatag_playlists(tag)]
         self.app.call_from_thread(self._apply_collection, title, items)
 
+    # --- «Моя волна»: station groups → stations -----------------------------
+
+    def _open_wave_groups(self) -> None:
+        """Level 1 under «Моя волна»: the station groups (Занятия, …)."""
+        self._collection_titlekey = 'wave'
+        self.query_one(Collection).loading = True
+        self.run_worker(self._fetch_wave_groups, thread=True)
+
+    def _fetch_wave_groups(self) -> None:
+        groups = self._client.wave_stations()
+        # The personal wave already auto-started on selecting «Моя волна», so
+        # the list holds only the drillable groups (Занятия, Настроения, …).
+        items: list[dict] = [
+            {'type': 'wave-group', 'group': key, 'title': f'{t("cat." + key)}  ›'}
+            for key, _types in self._client.WAVE_GROUPS
+            if groups.get(key)
+        ]
+        self.app.call_from_thread(self._apply_collection, t('cat.wave'), items)
+
+    def _open_wave_group(self, group: str) -> None:
+        """Level 2: the stations inside one wave group."""
+        self._collection_titlekey = group  # t('cat.'+group) is translatable
+        self.app.save_wave_group(group)  # type: ignore[attr-defined]
+        self.query_one(Collection).loading = True
+        self.run_worker(lambda: self._fetch_wave_group(group), thread=True)
+
+    def _fetch_wave_group(self, group: str) -> None:
+        stations = self._client.wave_stations().get(group, [])
+        items = [{'type': 'wave', 'station': s['station'], 'title': s['title']}
+                 for s in stations]
+        self.app.call_from_thread(self._apply_collection, t('cat.' + group), items)
+
     def _apply_collection(self, title: str, items: list[dict]) -> None:
         self.query_one(Collection).load_items(title, items)
         # Highlight after the async clear/append settles so indices line up.
@@ -310,6 +351,8 @@ class MainScreen(Screen):
                     and str(a.get('user_id')) == str(b.get('user_id')))
         if a['type'] == 'album':
             return str(a.get('album_id')) == str(b.get('album_id'))
+        if a['type'] == 'wave':
+            return str(a.get('station')) == str(b.get('station'))
         return False
 
     def _set_active_category(self, category: str) -> None:
@@ -327,7 +370,13 @@ class MainScreen(Screen):
         category = event.category
         self._set_active_category(category)
         if category == 'wave':
-            self._load_songs({'type': 'wave'}, autoplay=True)
+            # Start the personal wave right away, and fill the Collection with
+            # the station groups (Занятия / Настроения / …) to drill into.
+            self.app.save_wave_group(None)  # type: ignore[attr-defined]
+            self._load_songs(
+                {'type': 'wave', 'station': self._client.WAVE_STATION,
+                 'title': t('cat.wave')}, autoplay=True)
+            self._open_wave_groups()
         elif category in ('liked', 'chart', 'history'):
             self._load_songs({'type': category})
         else:
@@ -335,9 +384,16 @@ class MainScreen(Screen):
 
     def on_collection_item_selected(self, event: Collection.ItemSelected) -> None:
         source = event.source
-        if source.get('type') == 'tag':
+        kind = source.get('type')
+        if kind == 'tag':
             # Drill one level deeper: show this tag's playlists in the Collection.
             self._open_tag(source['tag'], source['title'].rstrip(' ›'))
+        elif kind == 'wave-group':
+            # Drill into a wave station group: show its stations in the Collection.
+            self._open_wave_group(source['group'])
+        elif kind == 'wave':
+            # A concrete station — start its infinite wave and play right away.
+            self._load_songs(source, autoplay=True)
         else:
             self._load_songs(source)
 
@@ -355,10 +411,19 @@ class MainScreen(Screen):
     # Localisation
     # ------------------------------------------------------------------
 
+    def _wave_title(self, source: dict) -> str:
+        """Songs-panel title for a wave: the station name, or «Моя волна»."""
+        title = source.get('title')
+        if title and source.get('station') not in (None, self._client.WAVE_STATION):
+            return title
+        return t('songs.wave')
+
     def _songs_title(self, source: dict) -> str:
         kind = source.get('type')
+        if kind == 'wave':
+            return self._wave_title(source)
         keys = {'liked': 'songs.liked', 'chart': 'songs.chart',
-                'history': 'songs.history', 'wave': 'songs.wave'}
+                'history': 'songs.history'}
         if kind in keys:
             return t(keys[kind])
         if kind == 'search':

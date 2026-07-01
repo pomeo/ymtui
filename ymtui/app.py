@@ -524,6 +524,14 @@ class YMPlayerApp(App):
             self.state.pop('tag', None)
         save_state(self.state)
 
+    def save_wave_group(self, group: str | None) -> None:
+        """Remember (or clear) the «Моя волна» station group drilled into."""
+        if group:
+            self.state['wave_group'] = group
+        else:
+            self.state.pop('wave_group', None)
+        save_state(self.state)
+
     def _persist_track(self) -> None:
         if self._current_track is None:
             return
