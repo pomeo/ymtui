@@ -183,6 +183,20 @@ class YMClient:
         """Select which rotor station the wave engine streams/feeds back to."""
         self._wave_station = station or self.WAVE_STATION
 
+    def set_wave_diversity(self, diversity: str) -> bool:
+        """Set the current station's «Характер»: default/favorite/discover/popular.
+
+        Stored server-side for the account, so it also resets mood/language to
+        «any» (the settings endpoint takes all three at once).
+        """
+        try:
+            return self._client.rotor_station_settings2(
+                self._wave_station, mood_energy='all', diversity=diversity,
+                language='any',
+            )
+        except Exception:
+            return False
+
     def wave_stations(self) -> dict[str, list[dict]]:
         """Return station descriptors grouped by :attr:`WAVE_GROUPS` key.
 

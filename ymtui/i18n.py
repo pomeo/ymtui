@@ -51,6 +51,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         'np.repeat': 'Repeat',
         'np.repeat.all': 'All',
         'np.repeat.one': 'One',
+        'np.wave': 'Wave',
+        'np.wave.default': 'Auto',
+        'np.wave.favorite': 'Favorite',
+        'np.wave.discover': 'Discover',
+        'np.wave.popular': 'Popular',
         'np.volume': 'Volume',
         'np.on': 'On',
         'np.off': 'Off',
@@ -61,6 +66,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         'bind.like': 'Like',
         'bind.shuffle': 'Shuffle',
         'bind.repeat': 'Repeat',
+        'bind.wave': 'Wave mode',
         'bind.seekback': '« 5s',
         'bind.seekfwd': '5s »',
         'bind.volup': 'Vol+',
@@ -81,6 +87,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
   l          like / unlike current track
   s          toggle shuffle
   r          toggle repeat
+  d          wave: auto / favorite / discover / popular
   + / -      volume up / down
 
 [b]Navigation[/b]
@@ -141,6 +148,11 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         'np.repeat': 'Повтор',
         'np.repeat.all': 'Все',
         'np.repeat.one': 'Один',
+        'np.wave': 'Волна',
+        'np.wave.default': 'Авто',
+        'np.wave.favorite': 'Любимое',
+        'np.wave.discover': 'Незнакомое',
+        'np.wave.popular': 'Популярное',
         'np.volume': 'Громкость',
         'np.on': 'Вкл',
         'np.off': 'Выкл',
@@ -150,6 +162,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         'bind.like': 'Лайк',
         'bind.shuffle': 'Перемешать',
         'bind.repeat': 'Повтор',
+        'bind.wave': 'Характер',
         'bind.seekback': '« 5с',
         'bind.seekfwd': '5с »',
         'bind.volup': 'Громк+',
@@ -169,6 +182,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
   l          лайк текущего трека
   s          перемешать
   r          повтор
+  d          волна: авто / любимое / незнакомое / популярное
   + / -      громче / тише
 
 [b]Навигация[/b]

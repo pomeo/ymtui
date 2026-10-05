@@ -84,6 +84,7 @@ class NowPlaying(Container):
     volume: reactive[int] = reactive(80)
     shuffle: reactive[bool] = reactive(False)
     repeat: reactive[str] = reactive('off')  # 'off' | 'all' | 'one'
+    wave: reactive[str] = reactive('default')  # «Моя волна» character
     device: reactive[str] = reactive('ymtui')
 
     def compose(self) -> ComposeResult:
@@ -153,6 +154,9 @@ class NowPlaying(Container):
     def watch_repeat(self, _: bool) -> None:
         self._refresh_border()
 
+    def watch_wave(self, _: str) -> None:
+        self._refresh_border()
+
     def watch_device(self, _: str) -> None:
         self._refresh_border()
 
@@ -175,5 +179,6 @@ class NowPlaying(Container):
         repeat = {'all': t('np.repeat.all'), 'one': t('np.repeat.one')}.get(self.repeat, off)
         self.border_title = (
             f'{t("np.playing")} ({self.device})  |  {t("np.shuffle")}: {shuffle}  |  '
-            f'{t("np.repeat")}: {repeat}  |  {t("np.volume")}: {self.volume}%'
+            f'{t("np.repeat")}: {repeat}  |  {t("np.wave")}: {t("np.wave." + self.wave)}  |  '
+            f'{t("np.volume")}: {self.volume}%'
         )

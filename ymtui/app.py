@@ -66,6 +66,8 @@ class YMPlayerApp(App):
         self._mpris = MprisServer(self)
         # Persisted session state (last source / track / position)
         self.state: dict = load_state()
+        # «Моя волна» character: 'default' | 'favorite' | 'discover' | 'popular'
+        self.wave_diversity: str = self.state.get('wave_diversity', 'default')
         i18n.set_language(self.state.get('language', 'en'))
         self._started: bool = False          # has mpv played anything this run?
         self._resume_position: float = 0.0   # seek offset for the primed track
@@ -343,6 +345,15 @@ class YMPlayerApp(App):
         # Cycle: off → all → one → off
         self.repeat_mode = {'off': 'all', 'all': 'one', 'one': 'off'}[self.repeat_mode]
         self._safe_np(lambda np: setattr(np, 'repeat', self.repeat_mode))
+
+    def cycle_wave_diversity(self) -> None:
+        # Cycle: default → favorite → discover → popular → default
+        order = ['default', 'favorite', 'discover', 'popular']
+        idx = order.index(self.wave_diversity) if self.wave_diversity in order else -1
+        self.wave_diversity = order[(idx + 1) % len(order)]
+        self.state['wave_diversity'] = self.wave_diversity
+        save_state(self.state)
+        self._safe_np(lambda np: setattr(np, 'wave', self.wave_diversity))
 
     def seek(self, delta: float) -> None:
         """Seek the playing track by ``delta`` seconds (or scrub a primed one)."""

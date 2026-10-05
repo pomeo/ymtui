@@ -34,6 +34,7 @@ def build_main_bindings() -> list[Binding]:
         Binding('l', 'like', t('bind.like')),
         Binding('s', 'shuffle', t('bind.shuffle')),
         Binding('r', 'repeat', t('bind.repeat')),
+        Binding('d', 'wave_diversity', t('bind.wave')),
         Binding('comma,less_than_sign', 'seek_back', t('bind.seekback')),
         Binding('full_stop,greater_than_sign', 'seek_forward', t('bind.seekfwd')),
         Binding('plus,equals_sign', 'volume_up', t('bind.volup'), show=False),
@@ -93,6 +94,7 @@ class MainScreen(Screen):
         np.volume = self.app.player.volume  # type: ignore[attr-defined]
         np.shuffle = self.app.shuffle  # type: ignore[attr-defined]
         np.repeat = self.app.repeat_mode  # type: ignore[attr-defined]
+        np.wave = self.app.wave_diversity  # type: ignore[attr-defined]
         # Songs panel active on start, so the user can press play right away.
         self.query_one(TrackList).focus()
         self.query_one(Collection).loading = True
@@ -169,6 +171,10 @@ class MainScreen(Screen):
         kind = source.get('type')
         if kind == 'wave':
             self._client.set_wave_station(source.get('station'))
+            # Only touch the server-side «Характер» once the user picked one
+            # here, so a setting made in the official app isn't overwritten.
+            if 'wave_diversity' in self.app.state:  # type: ignore[attr-defined]
+                self._client.set_wave_diversity(self.app.wave_diversity)  # type: ignore[attr-defined]
             tracks, batch_id = self._client.wave_batch()
             if batch_id:
                 self._client.wave_radio_started(batch_id)
@@ -473,6 +479,12 @@ class MainScreen(Screen):
 
     def action_repeat(self) -> None:
         self.app.toggle_repeat()  # type: ignore[attr-defined]
+
+    def action_wave_diversity(self) -> None:
+        self.app.cycle_wave_diversity()  # type: ignore[attr-defined]
+        # A wave is playing — restart it so the new character takes effect.
+        if self._song_source.get('type') == 'wave':
+            self._load_songs(self._song_source, autoplay=True)
 
     def action_seek_back(self) -> None:
         self.app.seek(-5)  # type: ignore[attr-defined]
